@@ -27,33 +27,52 @@ When responding:
 - If questions fall outside of course content, politely state you can only answer questions about middle school computer science.
 `;
 
-  // Register the assistant using the older working syntax.
+  // Register the extension using the older working syntax.
   codioIDE.coachBot.register("iNeedHelpButton", "PyGame Questions", onButtonPress);
 
   async function onButtonPress() {
     console.log(`PyGame Zero Assistant v${VERSION} started`);
+    codioIDE.coachBot.write(
+      `PyGame Zero Assistant v${VERSION} - Ask me questions about PyGame Zero!`,
+      codioIDE.coachBot.MESSAGE_ROLES.ASSISTANT
+    );
 
     let messages = [];
 
-    // Loop until student types "Thanks"
     while (true) {
-      // Provide a prompt hint to the student.
+      // Prompt with a hint for the student's question.
       const input = await codioIDE.coachBot.input("What's your PyGame Zero question?", "");
       
-      if (input === "Thanks") {
-        break;
-      }
-      
-      // Special command to check version.
+      if (input === "Thanks") break;
       if (input === "version") {
         codioIDE.coachBot.write(`Current version: ${VERSION}`, codioIDE.coachBot.MESSAGE_ROLES.ASSISTANT);
         continue;
       }
       
-      // Fetch updated context as JSON.
+      // Retrieve context and add debugging information.
       const context = await codioIDE.coachBot.getContext();
+      console.log("Full context retrieved:", JSON.stringify(context, null, 2));
+
+      // Debug: Log numbers of files and error messages separately.
+      if (context && context.files) {
+        console.log(`Found ${context.files.length} file(s) in context.`);
+        context.files.forEach(file => {
+          console.log(`File Name: ${file.name}`);
+          if (file.content) {
+            console.log(`File Content Preview: ${file.content.substr(0, 100)}...`); // preview first 100 characters
+          }
+        });
+      } else {
+        console.log("No files found in the context.");
+      }
       
-      // For simplicity, we include the context as a JSON string.
+      if (context && context.error) {
+        console.log("Error in context:", JSON.stringify(context.error, null, 2));
+      } else {
+        console.log("No error object found in context.");
+      }
+      
+      // Build a simple JSON string for context for the prompt.
       const contextText = `Context:\n${JSON.stringify(context)}`;
       
       const userPrompt = `Here is the question the student asked:
@@ -90,8 +109,8 @@ Please answer following these guidelines:
         messages.splice(0, 2);
       }
     }
-  
-    codioIDE.coachBot.write("You're welcome! Please feel free to ask any more questions about PyGame Zero!");
+    
+    codioIDE.coachBot.write("You're welcome! Please feel free to ask any more questions about PyGame Zero!", codioIDE.coachBot.MESSAGE_ROLES.ASSISTANT);
     codioIDE.coachBot.showMenu();
   }
 
