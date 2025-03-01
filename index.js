@@ -1,5 +1,7 @@
 (async function(codioIDE, window) {
   
+  const VERSION = "1.1.0"; // Updated version number
+  
   const systemPrompt = `You are a helpful assistant to a seventh grade student studying computer science for the first time. They are learning Python using PyGame Zero this year.
 
 PyGame Zero is a simplified version of PyGame designed for beginners. In our classroom setup:
@@ -71,65 +73,115 @@ If there are logic errors in their code, point them out and suggest how to fix t
 
 If asked about context outside of the course materials, respond by saying that you can only answer questions about middle school computer science. Keep responses brief and at a middle school reading level. Do not respond with more than 250 words at a time. For homework problems or graded assignments, help them understand the concepts but encourage them to develop their own solutions.`;
 
-  codioIDE.coachBot.register("iNeedHelpButton", "PyGame Questions", onButtonPress);
+  // Use proper options for the register method based on the documentation
+  codioIDE.coachBot.register({
+    id: "pygameZeroHelp",
+    name: "PyGame Questions",
+    callback: onButtonPress
+  });
 
   async function onButtonPress() {
+    console.log(`PyGame Zero Assistant v${VERSION} started`);
+    
+    // Show version to user on startup using write method with MESSAGE_ROLES.ASSISTANT
+    codioIDE.coachBot.write(`PyGame Zero Assistant v${VERSION} - Ask me questions about PyGame Zero!`, codioIDE.coachBot.MESSAGE_ROLES.ASSISTANT);
     
     let messages = [];
     
     while (true) {
-
-      const input = await codioIDE.coachBot.input();
+      // Use defaultText parameter to show a hint
+      const input = await codioIDE.coachBot.input("What's your PyGame Zero question?", "");
 
       if (input === "Thanks") {
         break;
       }
       
+      if (input === "version") {
+        codioIDE.coachBot.write(`Current version: ${VERSION}`, codioIDE.coachBot.MESSAGE_ROLES.ASSISTANT);
+        continue; // Skip processing this as a regular question
+      }
+      
       // Fetch updated context each time to capture any changes
       const context = await codioIDE.coachBot.getContext();
+      
+      // Extract code from files for easier access
+      let codeContent = "";
+      let errorContent = "";
+      
+      if (context && context.files && Array.isArray(context.files)) {
+        context.files.forEach(file => {
+          if (file && file.content) {
+            codeContent += `\nFile: ${file.name}\n\`\`\`python\n${file.content}\n\`\`\`\n`;
+          }
+        });
+      }
+      
+      if (context && context.error && context.error.message) {
+        errorContent = `\nCurrent Error:\n\`\`\`\n${context.error.message}\n\`\`\`\n`;
+      }
+      
+      // Log what we found (for debugging in browser console)
+      console.log(`Found ${context?.files?.length || 0} files in context`);
+      if (codeContent) console.log("Extracted code content");
+      if (errorContent) console.log("Found error content");
 
       const userPrompt = `Here is the question the student has asked:
 <student_question>
 ${input}
 </student_question>
 
-I'm providing you with the current context from the Codio environment. This context contains:
-- guidesPage: Information about the current instruction page the student is viewing
-- assignmentData: Information about the current assignment
-- files: Code from the files the student currently has open
-- error: Any error messages the student is experiencing
+I'm providing you with the current context from the Codio environment:
 
-Here's the context data:
-${JSON.stringify(context)}
+${codeContent ? "STUDENT CODE:\n" + codeContent : "No code files found in the context."}
 
-Please examine this context, especially any open code files and errors, when answering the student's question.
+${errorContent ? "ERROR:\n" + errorContent : "No errors found in the context."}
+
+${context && context.guidesPage && context.guidesPage.content ? 
+  "ASSIGNMENT INSTRUCTIONS:\n" + context.guidesPage.content : 
+  "No assignment instructions found in the context."}
+
+Please carefully analyze any code and errors above before responding. Do not ask to see code that is already provided in the context.
 
 Please provide a helpful response following these guidelines:
 - Keep answers brief, clear and at a middle school reading level
 - For implementation questions ("How do I...?"), provide short, focused code examples
-- If you see code in the context, reference it in your answer when relevant
-- If you see errors in the context, address them specifically
+- If code is available in the context, reference specific parts when relevant to the student's question
+- If there are errors in the context, address them specifically and suggest corrections
 - Remember that sound/music features don't work in Codio
 - Avoid writing complete games or solutions to assignments`;
 
+      // Add message to the conversation history
       messages.push({
-        "role": "user",
+        "role": codioIDE.coachBot.MESSAGE_ROLES.USER,
         "content": userPrompt
       });
 
+      // Use the model settings and proper options from the documentation
       const result = await codioIDE.coachBot.ask({
         systemPrompt: systemPrompt,
         messages: messages
-      }, { preventMenu: true });
+      }, { 
+        preventMenu: true,
+        stream: true,
+        modelSettings: {
+          temperature: 0.7,    // Balanced between creative and consistent
+          maxTokens: 1024      // Reasonable response length
+        }
+      });
 
-      messages.push({ "role": "assistant", "content": result.result });
+      // Add the assistant's response to the messages array using the proper role
+      messages.push({ 
+        "role": codioIDE.coachBot.MESSAGE_ROLES.ASSISTANT, 
+        "content": result.result 
+      });
 
+      // Keep the conversation history manageable
       if (messages.length > 10) {
         messages.splice(0, 2);
       }
     }
 
-    codioIDE.coachBot.write("You're welcome! Please feel free to ask any more questions about this course!");
+    codioIDE.coachBot.write("You're welcome! Please feel free to ask any more questions about this course!", codioIDE.coachBot.MESSAGE_ROLES.ASSISTANT);
     codioIDE.coachBot.showMenu();
   }
 
