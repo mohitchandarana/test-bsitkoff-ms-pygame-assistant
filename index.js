@@ -48,10 +48,12 @@ If guide content is available, please refer to it for assignment context.`;
         codioIDE.coachBot.write(`Current version: ${VERSION}`, codioIDE.coachBot.MESSAGE_ROLES.ASSISTANT);
         continue;
       }
+
+      console.log("input", input)
       
       // Retrieve context and log details.
       const context = await codioIDE.coachBot.getContext();
-      console.log("Full context retrieved:", JSON.stringify(context, null, 2));
+      console.log("Full context retrieved:", context);
       
       // Prefer guide content from context, but if empty, attempt to load a file manually.
       let guideContent = (context.guidesPage && context.guidesPage.content && context.guidesPage.content.trim().length > 0)
@@ -69,6 +71,8 @@ If guide content is available, please refer to it for assignment context.`;
           guideContent = "No guide available.";
         }
       }
+
+      console.log("guideContent", guideContent)
       
       // Build the prompt: include the student's question and guide context.
       const userPrompt = `Here is the question the student asked:
